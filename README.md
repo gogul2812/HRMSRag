@@ -1,15 +1,66 @@
-# RAG Platform — Enterprise Multi-Tenant HRMS
+# RAG Platform — Enterprise Multi-Tenant HRMS Chatbot
 
-A production-grade, multi-tenant Retrieval-Augmented Generation (RAG) chatbot
-platform built as a set of independent microservices. It is used across multiple
-internal domains simultaneously (Healthcare, Clothing/Retail, HR/HRMS, and any
-future domain), with each domain isolated as its own tenant.
+A production-grade, **multi-tenant Retrieval-Augmented Generation (RAG)** chatbot
+platform built as a set of independent FastAPI microservices. Internal domains
+(Healthcare, Retail, HR/HRMS, …) run side-by-side, each isolated as its own tenant
+with **row-level security on every table**, per-tenant vector payloads, and
+tenant-scoped cache keys.
 
-> **New machine / teammate?** Follow **[`docs/SETUP_AND_RUN.md`](docs/SETUP_AND_RUN.md)**  
-> Commands: `setup_local.ps1` -> edit `.env` -> `start_local.ps1` -> `bootstrap_demo.ps1`  
-> Always `cd` into the folder that contains `docker-compose.dev.yml` (inner `rag-platform`).
+## ✨ Highlights
 
-## Prerequisites
+- **Microservices** — 7 FastAPI services behind a single gateway (JWT auth, rate limiting, health checks).
+- **RAG pipeline** — upload → parse → chunk → embed → hybrid search → rerank → grounded LLM answer with citations.
+- **Multi-tenancy** — isolation enforced at the database (row-level security), vector store, and cache layers.
+- **LLM routing** — Groq → Gemini → OpenRouter → local Ollama with automatic fallback.
+- **Guardrails & PII** — prompt-level guardrail policies and PII scrubbing before cloud LLM calls.
+- **Observability** — structured JSON logs, Prometheus metrics, OpenTelemetry tracing.
+- **Frontends** — Next.js admin portal (:3000) and user chat portal (:3001).
+- **Evals** — offline evaluation harness with retrieval/answer quality metrics.
+
+## 📁 Repository structure
+
+```text
+HRMSRag/
+├── services/                     # FastAPI microservices (each a src/ package)
+│   ├── gateway/                  #   :8000  single API entry, proxy
+│   ├── auth-service/             #   :8001  login, JWT, tenants & users
+│   ├── admin-config-service/     #   :8002  system prompts + guardrail policies
+│   ├── ingestion-service/        #   :8003  upload → parse → chunk → embed
+│   ├── retrieval-service/        #   :8004  hybrid search + rerank
+│   ├── llm-orchestrator-service/ #   :8005  RAG prompt + LLM + guardrails
+│   └── chat-service/             #   :8006  sessions / messages / SSE
+├── shared-libs/                  # Reusable libraries (editable installs)
+│   ├── schemas/                  # shared Pydantic models
+│   ├── auth-middleware/          # JWT validation + tenant context
+│   ├── observability/            # logs / metrics / traces
+│   └── pii/                      # PII scrubbing
+├── ai-core/                      # AI pipeline packages (no HTTP)
+│   ├── parsing/                  # file → text
+│   ├── chunking/                 # text → chunks
+│   ├── embedding/                # chunks → vectors
+│   ├── reranking/                # rank passages for a query
+│   └── llm_router/               # Groq → Gemini → OpenRouter → Ollama
+├── frontend/                     # Next.js npm workspaces
+│   ├── admin-portal/             # :3000  admin app
+│   ├── user-portal/              # :3001  user chat app
+│   └── shared-ui/                # shared React components
+├── data/                         # Postgres Alembic migrations, Qdrant, Redis
+├── evals/                        # offline RAG evaluation harness
+├── infra/                        # Docker, Kubernetes, Terraform, CI/CD
+├── scripts/                      # PowerShell helpers for local dev
+├── samples/demo/                 # demo documents to upload
+├── docs/                         # architecture, runbooks, module specs
+├── .env.example                  # env template — copy to .env
+├── docker-compose.dev.yml        # Postgres + Redis + Qdrant
+├── Makefile                      # up / down / migrate / test / lint
+└── requirements.txt              # all Python deps (editable installs)
+```
+
+Every Python package uses the `src/` layout (`<pkg>/src/rag_platform_*/`) and is
+installed **editable** from the root `requirements.txt`, so imports work across the
+monorepo with no path hacks.
+
+## ✅ Prerequisites
 
 | Tool | Version |
 |---|---|
@@ -18,25 +69,28 @@ future domain), with each domain isolated as its own tenant.
 | Python | 3.11+ (3.13 OK) |
 | Node.js | 20+ |
 
----
+## 🚀 Installation
 
-## Quick start (Windows — recommended)
+### Windows (recommended)
 
-Open **PowerShell** in the `rag-platform` folder:
+Open PowerShell in the folder that contains `docker-compose.dev.yml`:
 
 ```powershell
 # Allow scripts for this window only
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
-# 1) First time on this PC (venv + requirements.txt + npm + Docker + migrations)
+# 1) One-time setup: venv + Python deps + npm install + Docker images
 .\scripts\setup_local.ps1
 
-# 2) Edit .env — set GROQ_API_KEY and CHANGE_ME passwords (see docs/API_KEYS.md)
+# 2) Create your environment file and edit it
+copy .env.example .env
+#    → set GROQ_API_KEY, POSTGRES_PASSWORD, REDIS_PASSWORD, JWT_SECRET_KEY
+#      (full guide: docs/API_KEYS.md)
 
-# 3) Start APIs + Admin (:3000) + User (:3001)
+# 3) Start everything: Docker infra + all APIs + both portals
 .\scripts\start_local.ps1
 
-# 4) Create demo Super Admin / Demo Corp / admin / user (first time only)
+# 4) First run only: create demo accounts
 .\scripts\bootstrap_demo.ps1
 ```
 
@@ -46,278 +100,135 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 | User portal | http://localhost:3001 |
 | API gateway health | http://localhost:8000/health |
 
-**Stop APIs:** `.\scripts\stop_local.ps1`
-
-Python deps live in root [`requirements.txt`](requirements.txt) (editable installs of all services + ai-core + shared-libs).
-
----
-
-## How to run (Windows — PowerShell) detailed
-
-Open PowerShell in the `rag-platform` folder for every step.
-
-### A) First time on a machine (one-time setup)
-
-Prefer: `.\scripts\setup_local.ps1` (does steps 1–5 below).
-
-**1. Environment file**
+Stop everything:
 
 ```powershell
-copy .env.example .env
+.\scripts\stop_local.ps1
 ```
 
-Edit `.env` and set at least:
-
-```env
-GROQ_API_KEY=gsk_your_key_here
-LLM_ROUTER_MODE=litellm
-CHAT_FAKE_ORCHESTRATOR=0
-POSTGRES_PASSWORD=your_strong_password
-REDIS_PASSWORD=your_redis_password
-JWT_SECRET_KEY=any_long_random_string
-SETUP_TOKEN=local-setup-token
-```
-
-Do **not** wrap the Groq key in quotes. Full key guide: [`docs/API_KEYS.md`](docs/API_KEYS.md).
-
-**2. Install Python packages**
+### Manual install (any OS)
 
 ```powershell
+# Python environment + deps
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1          # Linux/macOS: source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -r requirements.txt
-```
 
-**3. Install frontend dependencies**
+# Frontend deps
+cd frontend && npm install && cd ..
 
-```powershell
-cd frontend
-npm install
-cd ..
-```
-
-**4. Start Docker infra (Postgres, Redis, Qdrant)**
-
-```powershell
+# Infrastructure (Postgres :15432, Redis :16379, Qdrant :6333)
 docker compose -f docker-compose.dev.yml -f docker-compose.override.yml up -d
-```
 
-Wait until containers are healthy (`docker compose … ps`). Host ports:
-
-| Service | Host port |
-|---|---|
-| Postgres | **15432** |
-| Redis | **16379** |
-| Qdrant | **6333** |
-
-**5. Run database migrations**
-
-```powershell
-# Use the same POSTGRES_PASSWORD as in .env
+# Database migrations
 $env:DATABASE_URL_SYNC = "postgresql://raguser:<POSTGRES_PASSWORD>@127.0.0.1:15432/ragplatform"
 cd data\postgres
 python -m alembic upgrade head
 cd ..\..
 ```
 
----
+### macOS / Linux (Make)
 
-### B) Start the app (every day)
+```bash
+cp .env.example .env        # fill in values
+make up                     # start Postgres + Redis + Qdrant
+make migrate                # run Alembic migrations
+# then start each service with uvicorn, e.g.:
+# uvicorn app.main:app --app-dir services/gateway --port 8000 --reload
+```
+
+## 🧪 Usage examples
+
+**Start / stop the stack**
 
 ```powershell
-cd <path>\rag-platform
 .\scripts\start_local.ps1
-```
-
-This starts Docker (if needed), all API services, and both portals. It uses `.venv\Scripts\python.exe` when present.
-
-| App | URL |
-|---|---|
-| Admin portal | http://localhost:3000 |
-| User portal | http://localhost:3001 |
-| API gateway health | http://localhost:8000/health |
-
-**Stop API services:**
-
-```powershell
 .\scripts\stop_local.ps1
+docker compose -f docker-compose.dev.yml down
 ```
 
----
+**Health check**
 
-### C) First-time login (only if DB is empty)
-
-Prefer: `.\scripts\bootstrap_demo.ps1`
-
-If you already have the demo tenant on this machine, skip to **D**.
-
-```powershell
-# 1) Create tenant (copy the returned id)
-curl.exe -X POST http://localhost:8001/api/v1/tenants `
-  -H "setup-token: local-setup-token" `
-  -H "Content-Type: application/json" `
-  -d "{\"name\":\"Demo Corp\",\"domain\":\"demo\"}"
-
-# 2) Register admin (paste tenant id)
-curl.exe -X POST http://localhost:8001/api/v1/auth/register-admin `
-  -H "setup-token: local-setup-token" `
-  -H "Content-Type: application/json" `
-  -d "{\"email\":\"admin@example.com\",\"password\":\"StrongPassword123!\",\"tenant_id\":\"PASTE_TENANT_ID\",\"role\":\"admin\"}"
-
-# 3) Register end user (same tenant id)
-curl.exe -X POST http://localhost:8001/api/v1/auth/register `
-  -H "Content-Type: application/json" `
-  -d "{\"email\":\"user@example.com\",\"password\":\"StrongPassword123!\",\"tenant_id\":\"PASTE_TENANT_ID\"}"
+```bash
+curl http://localhost:8000/health
 ```
 
-### D) Demo credentials (this machine)
+**Bootstrap a tenant + users (manual)**
 
-**Organization login (User / Org Admin portals)** — pick organization from dropdown (no Tenant ID):
+```bash
+# create a tenant (copy the returned id)
+curl -X POST http://localhost:8001/api/v1/tenants \
+  -H "setup-token: local-setup-token" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Demo Corp","domain":"demo"}'
 
-| Field | Value |
-|---|---|
-| Organization | Demo Corp (or any org you create) |
-| Admin | `admin@example.com` / `StrongPassword123!` (existing Demo Corp admin) |
-| User | `user@example.com` / `StrongPassword123!` |
+# register an admin and a user with that tenant id
+curl -X POST http://localhost:8001/api/v1/auth/register-admin \
+  -H "setup-token: local-setup-token" -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"StrongPassword123!","tenant_id":"<TENANT_ID>","role":"admin"}'
 
-**Platform Super Admin** (Admin portal → check “Platform Super Admin”):
-
-| Field | Value |
-|---|---|
-| Email | `superadmin@example.com` |
-| Password | `StrongPassword123!` |
-
-Bootstrap Super Admin once (if missing):
-
-```powershell
-curl.exe -X POST http://localhost:8000/api/v1/organizations/bootstrap-super-admin `
-  -H "setup-token: local-setup-token" `
-  -H "Content-Type: application/json" `
-  -d "{\"name\":\"Platform Super Admin\",\"email\":\"superadmin@example.com\",\"password\":\"StrongPassword123!\"}"
+curl -X POST http://localhost:8001/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"StrongPassword123!","tenant_id":"<TENANT_ID>"}'
 ```
 
-Use SETUP_TOKEN from your `.env` if it differs.
+**Upload documents and chat**
 
-Auth model: Organization dropdown → JWT carries `organization_id` (same isolation as former `tenant_id` in data stores). See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-### E) Upload docs and chat
-
-1. Admin portal → **Documents** → upload files from `samples/demo/`
-2. Wait until each file shows **Indexed**
-3. User portal → **Chat** → ask e.g. *How many annual leave days do we get?*
+1. Admin portal → **Documents** → upload files from `samples/demo/`.
+2. Wait until each file shows **Indexed**.
+3. User portal → **Chat** → ask, e.g., *"How many annual leave days do we get?"*
 
 More sample questions: [`samples/demo/README.md`](samples/demo/README.md).
 
----
+**Demo accounts**
 
-## Copying to another laptop
+| Portal | Email | Password |
+|---|---|---|
+| Admin — Super Admin | `superadmin@example.com` | `StrongPassword123!` |
+| Admin — Demo Corp | `admin@example.com` | `StrongPassword123!` |
+| User | `user@example.com` | `StrongPassword123!` |
 
-1. Zip `rag-platform` (omit `frontend/node_modules`, `.venv`, `logs`).
-2. On the new PC: install Docker / Python / Node.
-3. Follow **[`docs/SETUP_AND_RUN.md`](docs/SETUP_AND_RUN.md)** (`setup_local.ps1` → edit `.env` → `start_local.ps1` → `bootstrap_demo.ps1`).
-4. Fresh Docker volumes mean empty DB + empty Qdrant → bootstrap users and re-upload demo docs.
+> Demo-only credentials — change them outside local development.
 
----
-
-## Architecture (modules & submodules)
-
-**Full write-up with diagrams:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-
-**Complete ground-truth dump for team / LLM assistants (ports, Docker, Redis, Pydantic, AI pipeline, flows):** [`docs/PROJECT_KNOWLEDGE_BASE.md`](docs/PROJECT_KNOWLEDGE_BASE.md)
-
-**New laptop / teammate setup:** [`docs/SETUP_AND_RUN.md`](docs/SETUP_AND_RUN.md)
-
-### High-level layout
+**Make targets**
 
 ```text
-Admin :3000 ──┐                    ┌─ Auth :8001
-              ├──► Gateway :8000 ──┼─ Admin-config :8002
-User  :3001 ──┘                    ├─ Ingestion :8003 ──► Celery ──► Qdrant
-                                   ├─ Retrieval :8004 ◄─────────────┘
-                                   ├─ Orchestrator :8005 ──► LLM (Groq…)
-                                   └─ Chat :8006 ──► Orchestrator
-
-Postgres (metadata) · Redis (jobs) · Qdrant (vectors)
+make up        start infrastructure containers
+make down      stop containers (volumes preserved)
+make migrate   run Alembic migrations
+make test      run all service unit tests
+make lint      ruff lint across services/ ai-core/ shared-libs/ data/
+make format    ruff format across the same
+make ps        container status
+make shell-db  psql inside the Postgres container
 ```
 
-### Modules
+## 🔐 Multi-tenancy
 
-| Module | Path | What it is |
-|---|---|---|
-| **Frontend** | `frontend/` | Next.js apps |
-| **Services** | `services/` | FastAPI microservices |
-| **AI Core** | `ai-core/` | Shared AI libraries (not HTTP) |
-| **Shared libs** | `shared-libs/` | Schemas, JWT, logging, PII |
-| **Data** | `data/` | Alembic + Qdrant setup |
-| **Infra** | `infra/` | Docker / K8s / CI |
-| **Scripts** | `scripts/` | `start_local.ps1` / `stop_local.ps1` |
-| **Samples** | `samples/demo/` | Demo docs to upload |
-| **Docs** | `docs/` | Specs + architecture |
+Every table, every Qdrant payload, and every cache key carries a
+`tenant_id`/`organization_id`. Onboarding a new domain = create a tenant record +
+invite an admin — **no new code, no new deployment**.
 
-### Frontend submodules
+## 🛡️ Security
 
-| Submodule | Port | Job |
-|---|---|---|
-| `admin-portal` | 3000 | Upload docs, rules, guardrails, users |
-| `user-portal` | 3001 | Chat, compare, history |
-| `shared-ui` | — | Shared UI package |
+- `.env`, `.env.local`, `*.bak` and other secret-bearing files are git-ignored — **never commit them**.
+- New API keys must come from environment variables or a secrets manager, never from source code.
+- Kubernetes secrets: `infra/k8s/base/secrets.example.yaml` (populate via External Secrets / sealed-secrets — see `infra/k8s/README.md`).
 
-### Backend service submodules
-
-| Service | Port | Job |
-|---|---|---|
-| `gateway` | 8000 | Single API entry; proxies to others |
-| `auth-service` | 8001 | Login, JWT, tenants/users |
-| `admin-config-service` | 8002 | System prompts + guardrail policies |
-| `ingestion-service` | 8003 | Upload → parse → chunk → embed → Qdrant |
-| `retrieval-service` | 8004 | Hybrid search + rerank |
-| `llm-orchestrator-service` | 8005 | RAG prompt + LLM + guardrails |
-| `chat-service` | 8006 | Sessions / messages / SSE |
-| `notification-service` | — | Stub (not fully wired) |
-
-Typical service folder: `app/api` → `app/application` → `app/domain` → `app/infrastructure`.
-
-### AI Core submodules (pipeline)
-
-| Layer | Package | Job |
-|---|---|---|
-| 1 | `ai-core/parsing` | File → text |
-| 2 | `ai-core/chunking` | Text → chunks |
-| 3 | `ai-core/embedding` | Chunks → vectors |
-| 5 | `ai-core/reranking` | Rank passages for a query |
-| 7 | `ai-core/llm_router` | Groq → Gemini → OpenRouter → Ollama |
-
-### Shared library submodules
-
-| Package | Job |
-|---|---|
-| `shared-libs/schemas` | Shared Pydantic models |
-| `shared-libs/auth-middleware` | JWT + tenant context |
-| `shared-libs/observability` | Logs / metrics / traces |
-| `shared-libs/pii` | Scrub sensitive data before cloud LLM |
-
-### Main flows (short)
-
-1. **Upload:** Admin → Gateway → Ingestion → Celery (parse/chunk/embed) → Qdrant + Postgres  
-2. **Chat:** User → Gateway → Chat → Orchestrator → Retrieval (+ Admin-config) → LLM → answer with citations  
-
-### Documentation index
+## 📚 Documentation
 
 | Doc | Purpose |
 |---|---|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Modules, ports, sequence diagrams |
-| [`docs/API_KEYS.md`](docs/API_KEYS.md) | Groq / Gemini / OpenRouter keys |
-| [`docs/modules/`](docs/modules/) | Full product specs (01–09) |
-| [`samples/demo/README.md`](samples/demo/README.md) | Demo login + test questions |
-## Multi-Tenancy
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Modules, ports, sequence diagrams |
+| [docs/SETUP_AND_RUN.md](docs/SETUP_AND_RUN.md) | Step-by-step local setup |
+| [docs/API_KEYS.md](docs/API_KEYS.md) | LLM provider keys setup |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Operations / troubleshooting |
+| [docs/PROJECT_KNOWLEDGE_BASE.md](docs/PROJECT_KNOWLEDGE_BASE.md) | Ground-truth technical dump |
+| [docs/modules/](docs/modules/) | Full product specs (01–09) |
 
-Every table, every vector payload, and every cache key carries a `tenant_id`.
-This is non-negotiable — built in from the very first migration. A new
-domain/tenant is onboarded by: creating a tenant record, inviting an admin, and
-letting them upload documents and configure rules. No new code, no new
-deployment.
+## 🤝 Contributing
 
-## Key Contacts
-
-See individual service `README.md` files for ownership and runbook information.
+1. Fork the repo and create a feature branch.
+2. Run `make lint` and `make test` locally before opening a PR.
+3. Follow the conventions in `docs/modules/AI_DEVELOPMENT_RULES.md`.
