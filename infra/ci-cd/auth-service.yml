@@ -1,0 +1,31 @@
+# Source of truth: .github/workflows/auth-service.yml
+# GitHub Actions only loads workflows from .github/workflows/.
+# This file is kept for Module 6 layout parity.
+
+name: CI — auth-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/auth-service/**
+      - infra/docker/Dockerfile.auth-service
+      - shared-libs/**
+  pull_request:
+    branches: [main]
+    paths:
+      - services/auth-service/**
+      - infra/docker/Dockerfile.auth-service
+      - shared-libs/**
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: auth-service
+      service_path: services/auth-service
+      dockerfile: infra/docker/Dockerfile.auth-service
+      context: "."
+
+    secrets: inherit

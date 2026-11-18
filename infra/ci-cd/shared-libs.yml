@@ -1,0 +1,75 @@
+# Source of truth: .github/workflows/shared-libs.yml
+
+name: CI — shared-libs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "shared-libs/**"
+      - "ai-core/**"
+      - ".github/workflows/shared-libs.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "shared-libs/**"
+      - "ai-core/**"
+  workflow_dispatch:
+
+jobs:
+  gateway:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: gateway
+      service_path: services/gateway
+      dockerfile: infra/docker/Dockerfile.gateway
+      context: "."
+    secrets: inherit
+  auth-service:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: auth-service
+      service_path: services/auth-service
+      dockerfile: infra/docker/Dockerfile.auth-service
+      context: "."
+    secrets: inherit
+  admin-config-service:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: admin-config-service
+      service_path: services/admin-config-service
+      dockerfile: infra/docker/Dockerfile.admin-config-service
+      context: "."
+    secrets: inherit
+  ingestion-service:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: ingestion-service
+      service_path: services/ingestion-service
+      dockerfile: infra/docker/Dockerfile.ingestion-service
+      context: "."
+    secrets: inherit
+  retrieval-service:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: retrieval-service
+      service_path: services/retrieval-service
+      dockerfile: infra/docker/Dockerfile.retrieval-service
+      context: "."
+    secrets: inherit
+  llm-orchestrator-service:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: llm-orchestrator-service
+      service_path: services/llm-orchestrator-service
+      dockerfile: infra/docker/Dockerfile.llm-orchestrator-service
+      context: "."
+    secrets: inherit
+  chat-service:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: chat-service
+      service_path: services/chat-service
+      dockerfile: infra/docker/Dockerfile.chat-service
+      context: "."
+    secrets: inherit

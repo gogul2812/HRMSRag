@@ -1,0 +1,115 @@
+# =============================================================================
+# RAG Platform — Local Development Compose (Stage 0)
+# =============================================================================
+# Brings up infrastructure services only.
+# Application services are started individually via `uvicorn` during
+# development (they are added here in Stage 1+).
+#
+# Usage:
+#   cp .env.example .env   # fill in values
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml ps
+#   docker compose -f docker-compose.dev.yml down -v   # ← destroys volumes
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: ragplatform_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ragplatform}
+      POSTGRES_USER: ${POSTGRES_USER:-raguser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-raguser} -d ${POSTGRES_DB:-ragplatform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ragplatform_net
+
+  # ---------------------------------------------------------------------------
+  # Redis 7
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: ragplatform_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - ragplatform_net
+
+  # ---------------------------------------------------------------------------
+  # Qdrant — self-hosted vector database
+  # ---------------------------------------------------------------------------
+  qdrant:
+    # v1.12+ required for /points/query used by qdrant-client>=1.12
+    image: qdrant/qdrant:v1.13.6
+    container_name: ragplatform_qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"         # HTTP / gRPC REST
+      - "${QDRANT_GRPC_PORT:-6334}:6334"    # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./data/qdrant/config:/qdrant/config:ro
+    # Set QDRANT_API_KEY in .env AND uncomment below to enable API-key auth:
+    # environment:
+    #   QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
+    # Qdrant image often has no curl; TCP probe avoids false "unhealthy"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333' || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ragplatform_net
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    name: ragplatform_postgres_data
+  redis_data:
+    name: ragplatform_redis_data
+  qdrant_data:
+    name: ragplatform_qdrant_data
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  ragplatform_net:
+    name: ragplatform_net
+    driver: bridge

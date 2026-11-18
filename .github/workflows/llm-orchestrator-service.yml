@@ -1,0 +1,29 @@
+name: CI — llm-orchestrator-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/llm-orchestrator-service/**
+      - infra/docker/Dockerfile.llm-orchestrator-service
+      - shared-libs/**
+      - ai-core/**
+  pull_request:
+    branches: [main]
+    paths:
+      - services/llm-orchestrator-service/**
+      - infra/docker/Dockerfile.llm-orchestrator-service
+      - shared-libs/**
+      - ai-core/**
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: llm-orchestrator-service
+      service_path: services/llm-orchestrator-service
+      dockerfile: infra/docker/Dockerfile.llm-orchestrator-service
+      context: "."
+
+    secrets: inherit

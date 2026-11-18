@@ -1,0 +1,157 @@
+# =============================================================================
+# Staging stack — single VM (Docker Compose)
+# =============================================================================
+# Infra + all API services for shared demos. Prefer Kubernetes overlay for
+# multi-node; this file satisfies Module 6 "staging = Compose on a VM".
+#
+# Usage (from repo root):
+#   cp .env.example .env   # set secrets
+#   docker compose -f docker-compose.dev.yml -f infra/docker-compose/staging.yml up -d --build
+# =============================================================================
+
+services:
+  gateway:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.gateway
+    image: rag-platform/gateway:staging
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      AUTH_SERVICE_URL: http://auth-service:8001
+      ADMIN_CONFIG_SERVICE_URL: http://admin-config-service:8002
+      INGESTION_SERVICE_URL: http://ingestion-service:8003
+      RETRIEVAL_SERVICE_URL: http://retrieval-service:8004
+      LLM_ORCHESTRATOR_SERVICE_URL: http://llm-orchestrator-service:8005
+      CHAT_SERVICE_URL: http://chat-service:8006
+    depends_on:
+      - auth-service
+      - chat-service
+    networks:
+      - ragplatform_net
+
+  auth-service:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.auth-service
+    image: rag-platform/auth-service:staging
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+    networks:
+      - ragplatform_net
+
+  admin-config-service:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.admin-config-service
+    image: rag-platform/admin-config-service:staging
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    networks:
+      - ragplatform_net
+
+  ingestion-service:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.ingestion-service
+    image: rag-platform/ingestion-service:staging
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-fake}
+      CELERY_TASK_ALWAYS_EAGER: "0"
+    networks:
+      - ragplatform_net
+
+  ingestion-worker:
+    image: rag-platform/ingestion-service:staging
+    restart: unless-stopped
+    command: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=INFO"]
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-fake}
+      CELERY_TASK_ALWAYS_EAGER: "0"
+    depends_on:
+      - ingestion-service
+      - redis
+    networks:
+      - ragplatform_net
+
+  retrieval-service:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.retrieval-service
+    image: rag-platform/retrieval-service:staging
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-fake}
+      RERANKER_MODEL_NAME: ${RERANKER_MODEL_NAME:-fake}
+    networks:
+      - ragplatform_net
+
+  llm-orchestrator-service:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.llm-orchestrator-service
+    image: rag-platform/llm-orchestrator-service:staging
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      LLM_ROUTER_MODE: ${LLM_ROUTER_MODE:-fake}
+      RETRIEVAL_SERVICE_URL: http://retrieval-service:8004
+      ADMIN_CONFIG_SERVICE_URL: http://admin-config-service:8002
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      PII_SCRUB_MODE: ${PII_SCRUB_MODE:-regex}
+    networks:
+      - ragplatform_net
+
+  chat-service:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.chat-service
+    image: rag-platform/chat-service:staging
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      LLM_ORCHESTRATOR_SERVICE_URL: http://llm-orchestrator-service:8005
+      CHAT_FAKE_ORCHESTRATOR: ${CHAT_FAKE_ORCHESTRATOR:-0}
+    networks:
+      - ragplatform_net

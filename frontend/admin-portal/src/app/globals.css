@@ -1,0 +1,51 @@
+:root {
+  --rp-bg: #0c1219;
+  --rp-bg-elevated: #141c27;
+  --rp-bg-muted: #1a2433;
+  --rp-surface: #1e2a3a;
+  --rp-border: #2a3a4f;
+  --rp-text: #e8eef6;
+  --rp-text-muted: #8fa3b8;
+  --rp-accent: #12a896;
+  --rp-accent-strong: #12b5a0;
+  --rp-accent-soft: rgba(18, 181, 160, 0.14);
+  --rp-danger: #e35d6a;
+  --rp-warning: #d4a017;
+  --rp-success: #2bb673;
+  --rp-info: #4c8dff;
+  --rp-radius: 10px;
+  --rp-font-sans: "Sora", "Segoe UI", sans-serif;
+  --rp-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--rp-font-sans);
+  color: var(--rp-text);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(18, 181, 160, 0.18), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, rgba(76, 141, 255, 0.12), transparent 50%),
+    linear-gradient(165deg, #0a1018 0%, #0f1824 45%, #0c141c 100%);
+  background-attachment: fixed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+}
+

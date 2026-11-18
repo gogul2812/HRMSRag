@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-platform-config
+  namespace: rag-platform
+data:
+  APP_ENV: "staging"
+  LOG_LEVEL: "DEBUG"
+  LOG_FORMAT: "json"
+  EMBEDDING_MODEL_NAME: "fake"
+  RERANKER_MODEL_NAME: "fake"
+  LLM_ROUTER_MODE: "fake"
+  PII_SCRUB_MODE: "regex"
+  GATEWAY_RATE_LIMIT_PER_MINUTE: "300"

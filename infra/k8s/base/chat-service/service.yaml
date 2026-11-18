@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chat-service
+  namespace: rag-platform
+  labels:
+    app: chat-service
+spec:
+  selector:
+    app: chat-service
+  ports:
+    - name: http
+      port: 8006
+      targetPort: http
+  type: ClusterIP

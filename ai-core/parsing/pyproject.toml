@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-platform-parsing"
+version = "0.1.0"
+description = "Document parsing (Docling + Tesseract) for RAG Platform ai-core"
+requires-python = ">=3.11"
+dependencies = [
+    "pytesseract>=0.3.10",
+    "Pillow>=10.0.0",
+    "pydantic>=2.7,<3",
+    "pypdf>=4.0.0",
+]
+
+[project.optional-dependencies]
+docling = ["docling>=2.0.0"]
+test = ["pytest>=8", "reportlab>=4.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

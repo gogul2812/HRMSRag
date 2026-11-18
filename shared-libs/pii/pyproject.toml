@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-platform-pii"
+version = "0.1.0"
+description = "PII scrubbing for logs and cloud LLM payloads (Presidio with local fallback)"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic-settings>=2.3,<3",
+]
+
+[project.optional-dependencies]
+presidio = ["presidio-analyzer>=2.2.0", "presidio-anonymizer>=2.2.0"]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

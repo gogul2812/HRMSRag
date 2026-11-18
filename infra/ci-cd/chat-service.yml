@@ -1,0 +1,33 @@
+# Source of truth: .github/workflows/chat-service.yml
+# GitHub Actions only loads workflows from .github/workflows/.
+# This file is kept for Module 6 layout parity.
+
+name: CI — chat-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/chat-service/**
+      - infra/docker/Dockerfile.chat-service
+      - shared-libs/**
+      - ai-core/**
+  pull_request:
+    branches: [main]
+    paths:
+      - services/chat-service/**
+      - infra/docker/Dockerfile.chat-service
+      - shared-libs/**
+      - ai-core/**
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: chat-service
+      service_path: services/chat-service
+      dockerfile: infra/docker/Dockerfile.chat-service
+      context: "."
+
+    secrets: inherit

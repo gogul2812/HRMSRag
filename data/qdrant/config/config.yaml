@@ -1,0 +1,19 @@
+# Qdrant Configuration
+# Mounted at /qdrant/config/config.yaml
+# See: https://qdrant.tech/documentation/guides/configuration/
+#
+# API key auth is controlled by the container env var
+# QDRANT__SERVICE__API_KEY (from root .env QDRANT_API_KEY).
+# Leave QDRANT_API_KEY empty for local Stage 0–4 development.
+
+service:
+  max_request_size_mb: 100
+
+storage:
+  storage_path: /qdrant/storage
+  on_disk_payload: true
+
+optimizers:
+  indexing_threshold_kb: 20000
+
+log_level: INFO

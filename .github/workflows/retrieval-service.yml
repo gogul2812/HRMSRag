@@ -1,0 +1,29 @@
+name: CI — retrieval-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/retrieval-service/**
+      - infra/docker/Dockerfile.retrieval-service
+      - shared-libs/**
+      - ai-core/**
+  pull_request:
+    branches: [main]
+    paths:
+      - services/retrieval-service/**
+      - infra/docker/Dockerfile.retrieval-service
+      - shared-libs/**
+      - ai-core/**
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: retrieval-service
+      service_path: services/retrieval-service
+      dockerfile: infra/docker/Dockerfile.retrieval-service
+      context: "."
+
+    secrets: inherit

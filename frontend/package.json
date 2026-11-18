@@ -1,0 +1,17 @@
+{
+  "name": "rag-platform-frontend",
+  "private": true,
+  "workspaces": [
+    "shared-ui",
+    "admin-portal",
+    "user-portal"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev -w @rag-platform/admin-portal",
+    "dev:user": "npm run dev -w @rag-platform/user-portal",
+    "build:admin": "npm run build -w @rag-platform/admin-portal",
+    "build:user": "npm run build -w @rag-platform/user-portal",
+    "lint:admin": "npm run lint -w @rag-platform/admin-portal",
+    "lint:user": "npm run lint -w @rag-platform/user-portal"
+  }
+}

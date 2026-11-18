@@ -1,0 +1,29 @@
+# Example ConfigMap — real values come from overlays / external config.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-platform-config
+  namespace: rag-platform
+data:
+  APP_ENV: "production"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  JWT_ALGORITHM: "HS256"
+  QDRANT_HOST: "qdrant"
+  QDRANT_PORT: "6333"
+  QDRANT_COLLECTION: "document_chunks"
+  AUTH_SERVICE_URL: "http://auth-service:8001"
+  ADMIN_CONFIG_SERVICE_URL: "http://admin-config-service:8002"
+  INGESTION_SERVICE_URL: "http://ingestion-service:8003"
+  RETRIEVAL_SERVICE_URL: "http://retrieval-service:8004"
+  LLM_ORCHESTRATOR_SERVICE_URL: "http://llm-orchestrator-service:8005"
+  CHAT_SERVICE_URL: "http://chat-service:8006"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  PII_SCRUB_MODE: "auto"
+  LLM_ROUTER_MODE: "litellm"
+  EMBEDDING_MODEL_NAME: "BAAI/bge-large-en-v1.5"
+  RERANKER_MODEL_NAME: "BAAI/bge-reranker-v2-m3"
+  GATEWAY_RATE_LIMIT_PER_MINUTE: "120"
+  # Must be "0" so uploads dispatch to the ingestion-worker deployment via the
+  # Celery broker instead of running in-process on the ingestion-service API pod.
+  CELERY_TASK_ALWAYS_EAGER: "0"

@@ -1,0 +1,57 @@
+{
+  "tenant_key": "sample-healthcare",
+  "mode": "offline",
+  "faithfulness_mean": 0.8973,
+  "answer_relevancy_mean": 0.371,
+  "context_precision_mean": 1.0,
+  "case_count": 5,
+  "cases": [
+    {
+      "id": "phoenix-stack",
+      "faithfulness": 0.7667,
+      "answer_relevancy": 0.2857,
+      "context_precision": 1.0,
+      "must_include_hit_rate": 1.0,
+      "insufficient_ok": null,
+      "notes": []
+    },
+    {
+      "id": "phoenix-team-fhir",
+      "faithfulness": 0.72,
+      "answer_relevancy": 0.375,
+      "context_precision": 1.0,
+      "must_include_hit_rate": 1.0,
+      "insufficient_ok": null,
+      "notes": []
+    },
+    {
+      "id": "phoenix-timeline",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.4444,
+      "context_precision": 1.0,
+      "must_include_hit_rate": 1.0,
+      "insufficient_ok": null,
+      "notes": []
+    },
+    {
+      "id": "phoenix-data-residency",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.625,
+      "context_precision": 1.0,
+      "must_include_hit_rate": 1.0,
+      "insufficient_ok": null,
+      "notes": []
+    },
+    {
+      "id": "irrelevant-control",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.125,
+      "context_precision": 1.0,
+      "must_include_hit_rate": 1.0,
+      "insufficient_ok": true,
+      "notes": []
+    }
+  ],
+  "generated_at": "2026-07-20T05:57:47.346512+00:00",
+  "dataset": "sample_healthcare.json"
+}

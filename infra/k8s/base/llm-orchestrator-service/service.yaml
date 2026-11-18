@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-orchestrator-service
+  namespace: rag-platform
+  labels:
+    app: llm-orchestrator-service
+spec:
+  selector:
+    app: llm-orchestrator-service
+  ports:
+    - name: http
+      port: 8005
+      targetPort: http
+  type: ClusterIP

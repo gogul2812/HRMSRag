@@ -1,0 +1,43 @@
+FROM python:3.11-slim-bookworm AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy shared libraries and service pyproject.toml
+COPY shared-libs/schemas /build/shared-libs/schemas
+COPY shared-libs/auth-middleware /build/shared-libs/auth-middleware
+COPY shared-libs/observability /build/shared-libs/observability
+COPY services/auth-service/pyproject.toml /build/services/auth-service/
+
+WORKDIR /build/services/auth-service
+# We create a dummy app package to pip install dependencies
+RUN mkdir app && touch app/__init__.py
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -e .
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r <(pip freeze)
+
+# --- Runtime Stage ---
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash appuser
+
+WORKDIR /app
+COPY --from=builder /build/wheels /wheels
+# Install python dependencies from wheels
+RUN pip install --no-cache /wheels/*
+
+COPY --chown=appuser:appuser services/auth-service/app /app/app
+
+USER appuser
+
+EXPOSE 8001
+
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

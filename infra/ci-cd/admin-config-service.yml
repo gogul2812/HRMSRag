@@ -1,0 +1,31 @@
+# Source of truth: .github/workflows/admin-config-service.yml
+# GitHub Actions only loads workflows from .github/workflows/.
+# This file is kept for Module 6 layout parity.
+
+name: CI — admin-config-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/admin-config-service/**
+      - infra/docker/Dockerfile.admin-config-service
+      - shared-libs/**
+  pull_request:
+    branches: [main]
+    paths:
+      - services/admin-config-service/**
+      - infra/docker/Dockerfile.admin-config-service
+      - shared-libs/**
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: admin-config-service
+      service_path: services/admin-config-service
+      dockerfile: infra/docker/Dockerfile.admin-config-service
+      context: "."
+
+    secrets: inherit

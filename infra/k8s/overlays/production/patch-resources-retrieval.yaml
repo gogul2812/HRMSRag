@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retrieval-service
+  namespace: rag-platform
+spec:
+  template:
+    spec:
+      containers:
+        - name: retrieval-service
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi

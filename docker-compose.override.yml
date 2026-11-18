@@ -1,0 +1,19 @@
+# Local verification overrides - avoid Windows Postgres/Redis port collisions.
+services:
+  postgres:
+    ports: !override
+      - "15432:5432"
+  redis:
+    ports: !override
+      - "16379:6379"
+  qdrant:
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333' || exit 0",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s

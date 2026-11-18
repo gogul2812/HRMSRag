@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-platform-chunking"
+version = "0.1.0"
+description = "Table/header-aware chunking for RAG Platform ai-core"
+requires-python = ">=3.11"
+dependencies = [
+    "llama-index-core>=0.10.0",
+    "pydantic>=2.7,<3",
+    "rag-platform-parsing",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

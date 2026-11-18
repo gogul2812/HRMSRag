@@ -1,0 +1,23 @@
+:root {
+  --rp-bg: #0c1219;
+  --rp-bg-elevated: #141c27;
+  --rp-bg-muted: #1a2433;
+  --rp-surface: #1e2a3a;
+  --rp-border: #2a3a4f;
+  --rp-text: #e8eef6;
+  --rp-text-muted: #8fa3b8;
+  --rp-accent: #12a896;
+  --rp-accent-strong: #12b5a0;
+  --rp-accent-soft: rgba(18, 181, 160, 0.14);
+  --rp-danger: #e35d6a;
+  --rp-warning: #d4a017;
+  --rp-success: #2bb673;
+  --rp-info: #4c8dff;
+  --rp-radius: 10px;
+  --rp-font-sans: "Sora", "Segoe UI", sans-serif;
+  --rp-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}

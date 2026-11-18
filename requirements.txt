@@ -1,0 +1,43 @@
+# =============================================================================
+# RAG Platform — Python dependencies for local development
+# =============================================================================
+# Prefer the setup script (handles venv + checks):
+#   .\scripts\setup_local.ps1
+#
+# Or install manually (from rag-platform root, with venv activated):
+#   python -m pip install -U pip
+#   python -m pip install -r requirements.txt
+# =============================================================================
+
+# --- Shared libraries ---
+-e ./shared-libs/schemas
+-e ./shared-libs/auth-middleware
+-e ./shared-libs/observability
+-e ./shared-libs/pii
+
+# --- AI core ---
+-e ./ai-core/parsing[docling]
+-e ./ai-core/chunking
+-e ./ai-core/embedding[model]
+-e ./ai-core/reranking[model]
+-e ./ai-core/llm_router
+
+# --- Microservices ---
+-e ./services/auth-service
+-e ./services/gateway
+-e ./services/admin-config-service
+-e ./services/ingestion-service
+-e ./services/retrieval-service
+-e ./services/llm-orchestrator-service
+-e ./services/chat-service
+
+# --- Evaluation framework ---
+-e ./evals
+
+# --- Runtime tools used by scripts / Alembic ---
+uvicorn[standard]>=0.29.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.9
+httpx>=0.27.0
+# Pin litellm: 1.92+ may require Rust/Cargo to build from source on Windows
+litellm>=1.40.0,<1.92.0

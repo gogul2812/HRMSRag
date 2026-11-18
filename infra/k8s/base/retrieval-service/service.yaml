@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: retrieval-service
+  namespace: rag-platform
+  labels:
+    app: retrieval-service
+spec:
+  selector:
+    app: retrieval-service
+  ports:
+    - name: http
+      port: 8004
+      targetPort: http
+  type: ClusterIP

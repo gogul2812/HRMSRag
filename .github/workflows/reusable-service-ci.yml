@@ -1,0 +1,202 @@
+# Reusable CI for a Python microservice: lint → test → build → push → deploy.
+#
+# Caller must pass:
+#   service_name  — e.g. gateway, auth-service
+#   service_path  — e.g. services/gateway OR gateway (for gateway at repo root style)
+#   dockerfile    — path to Dockerfile
+#   context       — docker build context
+#   path_filters  — not used here; parent workflow owns `on.paths`
+
+name: Reusable service CI
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      service_path:
+        required: true
+        type: string
+      dockerfile:
+        required: true
+        type: string
+      context:
+        required: true
+        type: string
+      python_version:
+        required: false
+        type: string
+        default: "3.12"
+      run_tests:
+        required: false
+        type: boolean
+        default: true
+      extra_rollouts:
+        description: Comma-separated Deployment names to rollout after this image (e.g. ingestion-worker)
+        required: false
+        type: string
+        default: ""
+    secrets:
+      REGISTRY_TOKEN:
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.service_path }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+      - name: Install lint tools
+        run: pip install ruff
+      - name: Ruff check
+        run: ruff check .
+      - name: Ruff format
+        run: ruff format --check .
+
+  test:
+    name: Test
+    needs: lint
+    if: ${{ inputs.run_tests }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.service_path }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+      - name: Install package + test deps
+        run: |
+          pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          pip install pytest pytest-asyncio pytest-cov httpx || true
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+      - name: Pytest
+        run: |
+          if [ -d tests ]; then
+            pytest tests/ -q --cov=app --cov-report=term-missing || pytest tests/ -q
+          else
+            echo "No tests/ directory — skipping"
+          fi
+
+  build-push:
+    name: Build & push
+    needs: [lint, test]
+    if: always() && needs.lint.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ inputs.service_name }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy staging
+    needs: build-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubectl + kustomize
+        uses: azure/setup-kubectl@v4
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ~/.kube/config
+        env:
+          KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
+      - name: Deploy with kustomize
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
+            echo "KUBE_CONFIG_STAGING not set — skip live apply (image was pushed)."
+            exit 0
+          fi
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}/${{ inputs.service_name }}"
+          TAG="${{ github.sha }}"
+          cd infra/k8s/overlays/staging
+          kustomize edit set image "ghcr.io/ORG/rag-platform/${{ inputs.service_name }}=${IMAGE}:${TAG}"
+          kubectl apply -k .
+          kubectl -n rag-platform rollout status "deployment/${{ inputs.service_name }}" --timeout=180s || true
+          IFS=',' read -ra EXTRA <<< "${{ inputs.extra_rollouts }}"
+          for d in "${EXTRA[@]}"; do
+            d=$(echo "$d" | xargs)
+            [ -z "$d" ] && continue
+            kubectl -n rag-platform set image "deployment/$d" "*=${IMAGE}:${TAG}" || true
+            kubectl -n rag-platform rollout status "deployment/$d" --timeout=180s || true
+          done
+
+  deploy-production:
+    name: Deploy production
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+      - name: Deploy with kustomize
+        run: |
+          if [ -z "${{ secrets.KUBE_CONFIG_PRODUCTION }}" ]; then
+            echo "KUBE_CONFIG_PRODUCTION not set — skip live apply (awaiting cluster secrets)."
+            exit 0
+          fi
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}/${{ inputs.service_name }}"
+          TAG="${{ github.sha }}"
+          cd infra/k8s/overlays/production
+          kustomize edit set image "ghcr.io/ORG/rag-platform/${{ inputs.service_name }}=${IMAGE}:${TAG}"
+          kubectl apply -k .
+          kubectl -n rag-platform rollout status "deployment/${{ inputs.service_name }}" --timeout=300s || true
+          IFS=',' read -ra EXTRA <<< "${{ inputs.extra_rollouts }}"
+          for d in "${EXTRA[@]}"; do
+            d=$(echo "$d" | xargs)
+            [ -z "$d" ] && continue
+            kubectl -n rag-platform set image "deployment/$d" "*=${IMAGE}:${TAG}" || true
+            kubectl -n rag-platform rollout status "deployment/$d" --timeout=300s || true
+          done

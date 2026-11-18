@@ -1,0 +1,50 @@
+FROM python:3.11-slim-bookworm AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY shared-libs/schemas /build/shared-libs/schemas
+COPY shared-libs/auth-middleware /build/shared-libs/auth-middleware
+COPY shared-libs/observability /build/shared-libs/observability
+COPY services/admin-config-service/pyproject.toml /build/services/admin-config-service/
+
+WORKDIR /build/services/admin-config-service
+RUN mkdir app && touch app/__init__.py
+RUN pip install --no-cache-dir \
+    -e /build/shared-libs/schemas \
+    -e /build/shared-libs/auth-middleware \
+    -e /build/shared-libs/observability
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels \
+    fastapi "uvicorn[standard]" "sqlalchemy[asyncio]" asyncpg \
+    pydantic-settings "python-jose[cryptography]"
+
+# --- Runtime Stage ---
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash appuser
+
+WORKDIR /app
+
+COPY --from=builder /build/wheels /wheels
+COPY --from=builder /build/shared-libs /shared-libs
+RUN pip install --no-cache /wheels/* \
+    && pip install --no-cache \
+        -e /shared-libs/schemas \
+        -e /shared-libs/auth-middleware \
+        -e /shared-libs/observability
+
+COPY --chown=appuser:appuser services/admin-config-service/app /app/app
+
+USER appuser
+
+EXPOSE 8002
+
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]

@@ -1,0 +1,67 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: ghcr.io/ORG/rag-platform/gateway
+    newName: ghcr.io/ORG/rag-platform/gateway
+    newTag: production
+  - name: ghcr.io/ORG/rag-platform/auth-service
+    newName: ghcr.io/ORG/rag-platform/auth-service
+    newTag: production
+  - name: ghcr.io/ORG/rag-platform/admin-config-service
+    newName: ghcr.io/ORG/rag-platform/admin-config-service
+    newTag: production
+  - name: ghcr.io/ORG/rag-platform/ingestion-service
+    newName: ghcr.io/ORG/rag-platform/ingestion-service
+    newTag: production
+  - name: ghcr.io/ORG/rag-platform/retrieval-service
+    newName: ghcr.io/ORG/rag-platform/retrieval-service
+    newTag: production
+  - name: ghcr.io/ORG/rag-platform/llm-orchestrator-service
+    newName: ghcr.io/ORG/rag-platform/llm-orchestrator-service
+    newTag: production
+  - name: ghcr.io/ORG/rag-platform/chat-service
+    newName: ghcr.io/ORG/rag-platform/chat-service
+    newTag: production
+replicas:
+  - name: gateway
+    count: 3
+  - name: auth-service
+    count: 2
+  - name: admin-config-service
+    count: 2
+  - name: ingestion-service
+    count: 2
+  - name: ingestion-worker
+    count: 3
+  - name: retrieval-service
+    count: 3
+  - name: llm-orchestrator-service
+    count: 3
+  - name: chat-service
+    count: 3
+patches:
+  - path: patch-config.yaml
+  - path: patch-ingress.yaml
+  - path: patch-resources-retrieval.yaml
+  - path: patch-resources-orchestrator.yaml
+  - path: patch-resources-worker.yaml
+  - target:
+      kind: StatefulSet
+      name: postgres
+    patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: postgres
+  - target:
+      kind: Service
+      name: postgres
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: postgres

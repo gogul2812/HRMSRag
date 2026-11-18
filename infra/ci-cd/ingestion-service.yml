@@ -1,0 +1,34 @@
+# Source of truth: .github/workflows/ingestion-service.yml
+# GitHub Actions only loads workflows from .github/workflows/.
+# This file is kept for Module 6 layout parity.
+
+name: CI — ingestion-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/ingestion-service/**
+      - infra/docker/Dockerfile.ingestion-service
+      - shared-libs/**
+      - ai-core/**
+  pull_request:
+    branches: [main]
+    paths:
+      - services/ingestion-service/**
+      - infra/docker/Dockerfile.ingestion-service
+      - shared-libs/**
+      - ai-core/**
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service_name: ingestion-service
+      service_path: services/ingestion-service
+      dockerfile: infra/docker/Dockerfile.ingestion-service
+      context: "."
+      extra_rollouts: ingestion-worker
+
+    secrets: inherit

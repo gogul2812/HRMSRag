@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-platform-retrieval-service"
+version = "0.1.0"
+description = "Hybrid retrieval + rerank microservice for RAG Platform"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0,<1.0.0",
+    "uvicorn[standard]>=0.29.0",
+    "qdrant-client>=1.9.0",
+    "pydantic-settings>=2.3,<3",
+    "python-jose[cryptography]>=3.3.0",
+    "rag-platform-schemas",
+    "rag-platform-auth-middleware",
+    "rag-platform-observability",
+    "rag-platform-embedding",
+    "rag-platform-reranking",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pytest-asyncio>=0.23", "httpx"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

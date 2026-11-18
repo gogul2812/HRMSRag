@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-platform-config
+  namespace: rag-platform
+data:
+  APP_ENV: "production"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  EMBEDDING_MODEL_NAME: "BAAI/bge-large-en-v1.5"
+  RERANKER_MODEL_NAME: "BAAI/bge-reranker-v2-m3"
+  LLM_ROUTER_MODE: "litellm"
+  PII_SCRUB_MODE: "auto"
+  GATEWAY_RATE_LIMIT_PER_MINUTE: "120"
